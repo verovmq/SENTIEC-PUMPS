@@ -1,7 +1,8 @@
+import cv2
 import numpy as np
 
 from bombas.core.calibracion import pixel_desde_valor
-from bombas.core.preprocesado import grosor_tipico, preprocesar
+from bombas.core.preprocesado import grosor_tipico, preprocesar, reducir_mascara, vista_previa_mascara
 from sinteticos import COEF_H, EJE_H, EJE_Q, RECUADRO, grafico
 
 
@@ -28,3 +29,28 @@ def test_grosor_tipico():
     m = np.zeros((50, 50), bool)
     m[10:13, 5:45] = True  # trazo horizontal de 3 px
     assert grosor_tipico(m) == 3
+
+
+def test_reducir_mascara_conserva_trazos_finos():
+    m = np.zeros((7, 7), bool)
+    m[0, 0] = m[3, 4] = m[6, 6] = True
+    assert reducir_mascara(m, 3).tolist() == [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+
+
+def test_vista_previa_se_parece_a_la_mascara_completa():
+    img = cv2.resize(grafico(), None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
+    recuadro = tuple(v * 3 for v in RECUADRO)
+    previa, factor = vista_previa_mascara(img, recuadro, lado_max=700)
+    assert factor == 4 and max(previa.shape) <= 700
+    x0, y0, x1, y1 = recuadro
+    completa = reducir_mascara(preprocesar(img, recuadro)[y0 : y1 + 1, x0 : x1 + 1], factor)
+    # Casi todo el trazo de la vista previa está (±1 px) en la máscara completa reducida.
+    cerca = cv2.dilate(completa.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool)
+    assert (previa & cerca).sum() / previa.sum() > 0.9
+
+
+def test_vista_previa_responde_al_umbral():
+    img = grafico()
+    claro, _ = vista_previa_mascara(img, RECUADRO, umbral=60)
+    oscuro, _ = vista_previa_mascara(img, RECUADRO, umbral=180)
+    assert oscuro.sum() > claro.sum()

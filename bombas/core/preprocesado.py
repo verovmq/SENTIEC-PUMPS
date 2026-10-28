@@ -171,6 +171,25 @@ def quitar_componentes_pequenos(mascara: np.ndarray, lado_min: int) -> np.ndarra
     return grandes[etiquetas]
 
 
+def limpiar(
+    m: np.ndarray,
+    fraccion_linea: float = FRACCION_LINEA,
+    fraccion_texto: float = 0.025,
+    grosor_min: int | None = None,
+) -> np.ndarray:
+    """Pasos 4 y 5 sobre la máscara oscura de un recuadro: cuadrícula, cajas, marcos y texto."""
+    alto, ancho = m.shape
+    m = borrar_cuadricula(m, ancho - 1, alto - 1, fraccion_linea)
+    for cx0, cy0, cx1, cy1 in cajas_texto(m):
+        m[max(cy0, 0) : cy1 + 1, max(cx0, 0) : cx1 + 1] = False
+    tramos = _tramos_vh(m)
+    if grosor_min is None:
+        grosor_min = max(2, round(0.6 * grosor_tipico(m, tramos)))
+    m = quitar_trazos_finos(m, grosor_min, tramos)
+    lado_texto = max(6, int(fraccion_texto * (min(ancho, alto) - 1)))
+    return quitar_componentes_pequenos(m, lado_texto)
+
+
 def preprocesar(
     imagen: np.ndarray,
     recuadro: tuple[int, int, int, int],
@@ -189,14 +208,41 @@ def preprocesar(
     x0, y0, x1, y1 = recuadro
     # Se trabaja solo dentro del recuadro (bordes incluidos); fuera, la máscara es False.
     m = mascara_oscura(imagen[y0 : y1 + 1, x0 : x1 + 1], umbral)
-    m = borrar_cuadricula(m, x1 - x0, y1 - y0, fraccion_linea)
-    for cx0, cy0, cx1, cy1 in cajas_texto(m):
-        m[max(cy0, 0) : cy1 + 1, max(cx0, 0) : cx1 + 1] = False
-    tramos = _tramos_vh(m)
-    if grosor_min is None:
-        grosor_min = max(2, round(0.6 * grosor_tipico(m, tramos)))
-    m = quitar_trazos_finos(m, grosor_min, tramos)
-    lado_texto = max(6, int(fraccion_texto * min(x1 - x0, y1 - y0)))
     mascara = np.zeros(imagen.shape[:2], dtype=bool)
-    mascara[y0 : y1 + 1, x0 : x1 + 1] = quitar_componentes_pequenos(m, lado_texto)
+    mascara[y0 : y1 + 1, x0 : x1 + 1] = limpiar(m, fraccion_linea, fraccion_texto, grosor_min)
     return mascara
+
+
+def reducir_mascara(mascara: np.ndarray, factor: int) -> np.ndarray:
+    """Reduce la máscara `factor` veces: un píxel reducido es True si alguno de su bloque lo es.
+
+    Así un trazo fino no desaparece al reducir (con un promedio se aclararía).
+    """
+    if factor <= 1:
+        return mascara
+    alto, ancho = mascara.shape
+    a, b = -(-alto // factor) * factor, -(-ancho // factor) * factor
+    relleno = np.zeros((a, b), dtype=np.uint8)
+    relleno[:alto, :ancho] = mascara * np.uint8(255)  # 255: el promedio de un píxel en el bloque no se redondea a 0
+    # INTER_AREA con factor entero promedia cada bloque: media > 0 ⇔ algún píxel True.
+    return cv2.resize(relleno, (b // factor, a // factor), interpolation=cv2.INTER_AREA) > 0
+
+
+def vista_previa_mascara(
+    imagen: np.ndarray,
+    recuadro: tuple[int, int, int, int],
+    umbral: int = UMBRAL_OSCURO,
+    lado_max: int = 700,
+) -> tuple[np.ndarray, int]:
+    """Máscara aproximada y rápida del recuadro, para ajustar el umbral en vivo.
+
+    El umbral se aplica a resolución completa (así se comporta igual que en
+    `preprocesar`) y la limpieza se hace sobre la máscara reducida para que el
+    lado mayor no pase de `lado_max`. Devuelve la máscara del recuadro (no de la
+    imagen entera) y el factor de reducción. Es solo para visualizar: la
+    extracción usa siempre `preprocesar` a resolución completa.
+    """
+    x0, y0, x1, y1 = recuadro
+    m = mascara_oscura(imagen[y0 : y1 + 1, x0 : x1 + 1], umbral)
+    factor = max(1, -(-max(m.shape) // lado_max))
+    return limpiar(reducir_mascara(m, factor)), factor
