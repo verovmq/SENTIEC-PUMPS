@@ -19,9 +19,27 @@ class Magnitud(str, Enum):
     POTENCIA = "P"
 
 
+# Unidades que la interfaz ofrece por magnitud (lista editable: el usuario puede
+# escribir otra). Se guardan tal cual aparecen en el gráfico y no se convierten.
+UNIDADES_SUGERIDAS: dict[str, list[str]] = {
+    "caudal": ["m³/h", "L/s", "m³/s", "GPM", "USGPM", "IGPM"],
+    "altura": ["m", "ft"],
+    "eficiencia": ["%"],
+    "npsh": ["m", "ft"],
+    "potencia": ["kW", "HP", "C.V.", "CV", "PS"],
+}
+
+
 class Escala(str, Enum):
     LINEAL = "lineal"
     LOG = "log"
+
+
+class Rama(str, Enum):
+    """Rama de una curva de igual rendimiento en U (cada rama es monótona en H)."""
+
+    IZQUIERDA = "izquierda"
+    DERECHA = "derecha"
 
 
 class Orientacion(str, Enum):
@@ -58,7 +76,13 @@ class Calibracion:
 
 @dataclass
 class CurvaDigitalizada:
-    """Puntos extraídos de una curva, en unidades originales."""
+    """Puntos extraídos de una curva, en unidades originales.
+
+    `x`, `y` son siempre las coordenadas del gráfico (p. ej. Q y H). `funcion_de`
+    indica la variable independiente: "x" para y(x) (H(Q), η(Q)...) e "y" para
+    x(y), como las curvas de igual rendimiento, casi verticales, que se
+    describen como Q(H).
+    """
 
     magnitud: Magnitud
     eje_x: str
@@ -67,14 +91,19 @@ class CurvaDigitalizada:
     y: np.ndarray
     diametro: float | None = None  # diámetro del impulsor, si la curva depende de él
     unidad_diametro: str = "mm"
+    funcion_de: str = "x"
+    nivel: float | None = None  # η de una curva de igual rendimiento
+    rama: Rama | None = None
 
 
 @dataclass
 class CurvaAjustada:
-    """Polinomio y(x) ajustado a una curva digitalizada.
+    """Polinomio ajustado a una curva digitalizada.
 
-    `coeficientes` va de mayor a menor grado (convención de numpy.polyval).
-    Solo es válido en [x_min, x_max]; fuera de ese rango es extrapolación.
+    Con `funcion_de` = "x" el polinomio es y(x); con "y" es x(y) (p. ej. Q(H) en
+    una curva de igual rendimiento). `evaluar` recibe siempre la variable
+    independiente, y [x_min, x_max] es el rango de esa variable: fuera de él es
+    extrapolación. `coeficientes` va de mayor a menor grado (numpy.polyval).
     """
 
     magnitud: Magnitud
@@ -87,13 +116,23 @@ class CurvaAjustada:
     rmse: float
     diametro: float | None = None
     unidad_diametro: str = "mm"
+    funcion_de: str = "x"
+    nivel: float | None = None
+    rama: Rama | None = None
 
     @property
     def grado(self) -> int:
         return len(self.coeficientes) - 1
 
     @property
+    def es_iso_eficiencia(self) -> bool:
+        return self.nivel is not None
+
+    @property
     def etiqueta(self) -> str:
+        if self.es_iso_eficiencia:
+            rama = f" ({self.rama.value})" if self.rama else ""
+            return f"η {self.nivel:g} %{rama}"
         if self.diametro is None:
             return self.magnitud.value
         return f"{self.magnitud.value} – {self.diametro:g} {self.unidad_diametro}"
@@ -118,13 +157,18 @@ class Bomba:
 
         Si no hay curva para el diámetro pedido pero existe una única curva
         de la magnitud sin diámetro (p. ej. η común a todos), se devuelve esa.
+        Las curvas de igual rendimiento no cuentan: ver `iso_eficiencia`.
         """
-        candidatas = [c for c in self.curvas if c.magnitud == magnitud]
+        candidatas = [c for c in self.curvas if c.magnitud == magnitud and not c.es_iso_eficiencia]
         for c in candidatas:
             if c.diametro == diametro:
                 return c
         sin_diametro = [c for c in candidatas if c.diametro is None]
         return sin_diametro[0] if len(sin_diametro) == 1 else None
+
+    def iso_eficiencia(self) -> list[CurvaAjustada]:
+        """Curvas de igual rendimiento (gráficos con η como familia de curvas sobre H–Q)."""
+        return [c for c in self.curvas if c.es_iso_eficiencia]
 
     def diametros(self) -> list[float]:
         return sorted({c.diametro for c in self.curvas if c.diametro is not None})

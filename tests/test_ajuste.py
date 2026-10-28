@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from bombas.core.ajuste import ajustar, invertir
-from bombas.core.modelos import Bomba, CurvaDigitalizada, Magnitud
+from bombas.core.modelos import Bomba, CurvaDigitalizada, Magnitud, Rama
 
 # Curva H(Q) cúbica parecida a la de 738 mm de curvaBOMBA1.png (Q en m³/h, H en m).
 COEF_H = np.array([-2.0e-9, -4.0e-6, -2.0e-3, 204.0])
@@ -88,3 +88,16 @@ def test_bomba_busca_por_magnitud_y_diametro():
     assert bomba.curva(Magnitud.ALTURA, 700) is None
     assert bomba.curva(Magnitud.EFICIENCIA, 738) is eta  # η común a todos los diámetros
     assert bomba.diametros() == [608, 738]
+
+
+def test_ajuste_x_de_y_para_curvas_de_igual_rendimiento():
+    # Rama Q(H) = 500 + 0,01·(H − 150)², H en [100, 250].
+    h = np.linspace(100, 250, 30)
+    q = 500 + 0.01 * (h - 150) ** 2
+    datos = CurvaDigitalizada(Magnitud.EFICIENCIA, "Q", "H", q, h, funcion_de="y", nivel=78, rama=Rama.IZQUIERDA)
+    c = ajustar(datos, grado=2, unidad_x="m³/h", unidad_y="m")
+    np.testing.assert_allclose(c.evaluar(np.array([100, 150, 250])), [525, 500, 600])
+    assert (c.x_min, c.x_max) == (100, 250)  # rango de la variable independiente (H)
+    assert c.etiqueta == "η 78 % (izquierda)"
+    assert Bomba(curvas=[c]).curva(Magnitud.EFICIENCIA) is None  # no se confunde con η(Q)
+    assert Bomba(curvas=[c]).iso_eficiencia() == [c]

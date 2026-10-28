@@ -24,11 +24,15 @@ def ajustar(
     unidad_x: str = "",
     unidad_y: str = "",
 ) -> CurvaAjustada:
-    """Ajusta y(x) por mínimos cuadrados con numpy.polyfit."""
+    """Ajusta por mínimos cuadrados con numpy.polyfit.
+
+    Ajusta y(x), o x(y) si `curva.funcion_de` es "y" (curvas de igual rendimiento).
+    """
     if not GRADO_MINIMO <= grado <= GRADO_MAXIMO:
         raise ValueError(f"El grado debe estar entre {GRADO_MINIMO} y {GRADO_MAXIMO}.")
-    x = np.asarray(curva.x, dtype=float)
-    y = np.asarray(curva.y, dtype=float)
+    # x: variable independiente; y: dependiente.
+    x = np.asarray(curva.x if curva.funcion_de == "x" else curva.y, dtype=float)
+    y = np.asarray(curva.y if curva.funcion_de == "x" else curva.x, dtype=float)
     if x.shape != y.shape:
         raise ValueError("x e y deben tener la misma longitud.")
     if len(np.unique(x)) <= grado:
@@ -52,6 +56,9 @@ def ajustar(
         rmse=rmse,
         diametro=curva.diametro,
         unidad_diametro=curva.unidad_diametro,
+        funcion_de=curva.funcion_de,
+        nivel=curva.nivel,
+        rama=curva.rama,
     )
 
 
