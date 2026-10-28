@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bombas"
+version = "0.1.0"
+description = "Digitalizador de curvas de fabricante de bombas centrífugas (visión por computador clásica, sin IA)"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "scipy",
+    "opencv-python-headless",
+    "scikit-image",
+    "pypdfium2",
+    "pillow",
+    "plotly",
+    "nicegui",
+    "openpyxl",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-cov"]
+
+[tool.setuptools.packages.find]
+include = ["bombas*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
