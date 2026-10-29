@@ -1,7 +1,11 @@
+from pathlib import Path
+
 import cv2
 import numpy as np
+import pytest
 
 from bombas.core.calibracion import pixel_desde_valor
+from bombas.core.carga import cargar_archivo
 from bombas.core.preprocesado import grosor_tipico, preprocesar, reducir_mascara, vista_previa_mascara
 from sinteticos import COEF_H, EJE_H, EJE_Q, RECUADRO, grafico
 
@@ -23,6 +27,18 @@ def test_conserva_la_curva():
     cerca = [m[y - 2 : y + 3, x].any() for x, y in zip(xs, ys)]
     # Solo se pierden los pocos píxeles donde la curva cruza la cuadrícula mayor.
     assert np.mean(cerca) > 0.9
+
+
+@pytest.mark.parametrize("umbral", [100, 140, 180])
+def test_cruces_con_la_cuadricula_no_cortan_la_curva(umbral):
+    # En curvaBOMBA1 la cuadrícula gris está dibujada encima de las curvas: sin
+    # cerrar huecos, la curva de 768 mm quedaba cortada en cada cruce.
+    m = preprocesar(cargar_archivo(Path(__file__).parent / "datos" / "curvaBOMBA1.png"), (115, 239, 707, 758), umbral)
+    _, etiquetas = cv2.connectedComponents(m.astype(np.uint8))
+    curva = etiquetas == etiquetas[300, 118]  # empieza en (118, 300) y acaba hacia x = 600
+    assert curva[300, 118]
+    columnas = np.nonzero(curva.any(axis=0))[0]
+    assert columnas.min() <= 118 and columnas.max() >= 598
 
 
 def test_grosor_tipico():

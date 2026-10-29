@@ -221,6 +221,11 @@ class GestorGraficas:
         for fig in self._figuras.values():
             fig.data = tuple(t for t in fig.data if t.meta != grupo)
 
+    def quitar_puntos(self) -> None:
+        """Quita todos los puntos de las calculadoras (conserva las curvas)."""
+        for fig in self._figuras.values():
+            fig.data = tuple(t for t in fig.data if t.meta == META_CURVA)
+
     def dibujar_resultado(self, resultado, color: str, grupo: str) -> None:
         """Reemplaza los puntos del grupo por los del resultado de una calculadora."""
         self.quitar_grupo(grupo)

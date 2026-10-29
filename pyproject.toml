@@ -20,10 +20,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-cov"]
+dev = ["pytest", "pytest-cov", "pytest-asyncio"]
 
 [tool.setuptools.packages.find]
 include = ["bombas*"]
 
+[tool.setuptools.package-data]
+bombas = ["ui/imagenes_guia/*.png"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Simulador de usuario de NiceGUI (tests de la interfaz sin navegador).
+addopts = "-p nicegui.testing.user_plugin"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+main_file = ""
