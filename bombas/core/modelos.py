@@ -146,11 +146,31 @@ class CurvaAjustada:
 
 
 @dataclass
+class PuntoEficiencia:
+    """Punto de máximo rendimiento marcado en el gráfico (p. ej. el 81 % de la ER-3407).
+
+    En los gráficos con curvas de igual rendimiento, el valor máximo suele ser
+    solo un punto, no una curva. Debe tener η mayor que la curva más interna.
+    """
+
+    q: float
+    h: float
+    eta: float
+    diametro: float | None = None
+    unidad_diametro: str = "mm"
+
+    @property
+    def etiqueta(self) -> str:
+        return f"{self.eta:g} %"
+
+
+@dataclass
 class Bomba:
     """Conjunto de curvas ajustadas de una bomba."""
 
     nombre: str = ""
     curvas: list[CurvaAjustada] = field(default_factory=list)
+    puntos_eficiencia: list[PuntoEficiencia] = field(default_factory=list)
 
     def curva(self, magnitud: Magnitud, diametro: float | None = None) -> CurvaAjustada | None:
         """Curva de esa magnitud para ese diámetro.

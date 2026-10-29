@@ -143,7 +143,7 @@ def _eficiencia(bomba: Bomba, q: float, h: float | None, diametro) -> Valor:
     if iso:
         if h is None:
             return Valor(None, "%", avisos=["η: no se puede calcular sin H."])
-        r = eficiencia_en(iso, q, h)
+        r = eficiencia_en(iso, q, h, bomba.puntos_eficiencia)
         return Valor(r.valor, "%", r.cota_minima, [r.aviso] if r.aviso else [])
     return _evaluar(bomba.curva(Magnitud.EFICIENCIA, diametro), q, Magnitud.EFICIENCIA, diametro)
 

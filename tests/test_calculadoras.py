@@ -9,6 +9,7 @@ from bombas.core.calculadoras import (
     calcular_caudal,
     evaluar_punto,
 )
+from bombas.core.modelos import PuntoEficiencia
 from bombas_prueba import (
     COEF_ETA,
     COEF_H738,
@@ -116,3 +117,10 @@ def test_tipo_b_eficiencia_desde_el_mapa():
 def test_tipo_b_dentro_del_lazo_es_cota_minima():
     r = evaluar_punto(bomba_tipo_b(), 700, 180, 635)
     assert r.eta.valor == 80 and r.eta.cota_minima
+
+
+def test_tipo_b_con_punto_de_maximo_rendimiento():
+    b = bomba_tipo_b()
+    b.puntos_eficiencia.append(PuntoEficiencia(q=700, h=175, eta=85))
+    r = evaluar_punto(b, 700, 175, 635)
+    assert r.eta.valor == pytest.approx(85) and not r.eta.cota_minima

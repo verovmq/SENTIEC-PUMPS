@@ -18,7 +18,7 @@ from bombas.core.calibracion import pixel_desde_valor
 from bombas.core.carga import cargar_archivo
 from bombas.core.extraccion import digitalizar
 from bombas.core.iso_eficiencia import eficiencia_en
-from bombas.core.modelos import CurvaAjustada, Eje, Magnitud, Orientacion, Rama
+from bombas.core.modelos import CurvaAjustada, Eje, Magnitud, Orientacion, PuntoEficiencia, Rama
 from bombas.core.preprocesado import preprocesar
 
 IMAGEN = Path(__file__).parent / "datos" / "er3407.png"
@@ -154,3 +154,18 @@ def test_potencia_en_cv_sin_convertir(mascara, diametro, semillas, rango):
     assert c.unidad_y == "C.V."
     assert rango[0] <= c.evaluar(0) <= rango[1]  # potencia a caudal nulo leída en la imagen
     assert np.all(np.diff(c.evaluar(np.linspace(c.x_min, c.x_max, 20))) > 0)
+
+
+BEP_81 = [PuntoEficiencia(q=820, h=220, eta=81)]  # punto "81" del gráfico, sobre Ø635
+
+
+def test_punto_de_maximo_rendimiento(iso):
+    curvas = [c for c, _ in iso.values()]
+    # Sin el punto, (820; 220) queda fuera de las ramas; con él, vale 81 %.
+    assert eficiencia_en(curvas, 820, 220).valor is None
+    assert eficiencia_en(curvas, 820, 220, BEP_81).valor == pytest.approx(81)
+    # Dentro del lazo de 80 %: valor real entre 80 y 81 en vez de "≥ 80".
+    r = eficiencia_en(curvas, 760, 185, BEP_81)
+    assert 80 < r.valor < 81 and not r.cota_minima
+    # Fuera de la zona del máximo, igual que sin el punto.
+    assert eficiencia_en(curvas, 600, 150, BEP_81).valor == pytest.approx(78.6, abs=0.3)

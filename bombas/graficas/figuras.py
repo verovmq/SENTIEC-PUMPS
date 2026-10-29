@@ -146,6 +146,22 @@ class GestorGraficas:
             self._ejes(tipo, fig, curvas)
             if tipo == GRAFICA_ALTURA:
                 self._eje_eta = any(eje == "y2" for _, eje in curvas)
+                self._dibujar_puntos_eficiencia(fig)
+
+    def _dibujar_puntos_eficiencia(self, fig: go.Figure) -> None:
+        """Puntos de máximo rendimiento: dato del gráfico, en negro y sin líneas a los ejes."""
+        for p in self.bomba.puntos_eficiencia:
+            fig.add_trace(
+                go.Scatter(
+                    x=[p.q], y=[p.h], mode="markers", name=f"η máx. {p.etiqueta}", meta=META_CURVA,
+                    marker=dict(color=NEGRO, size=7, symbol="circle"),
+                    hovertemplate=f"η máx. {p.etiqueta}<br>%{{x:.4g}}, %{{y:.4g}}<extra></extra>",
+                )
+            )
+            fig.add_annotation(
+                x=p.q, y=p.h, text=p.etiqueta, name=META_CURVA, showarrow=False,
+                xanchor="left", yanchor="bottom", font=dict(color=NEGRO, size=11),
+            )
 
     def _ejes(self, tipo: str, fig: go.Figure, curvas) -> None:
         if not curvas:

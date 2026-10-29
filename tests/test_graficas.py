@@ -20,6 +20,7 @@ from bombas.graficas.estilos import (
     color_fila,
 )
 from bombas.graficas.figuras import META_CURVA, TIPOS, GestorGraficas
+from bombas.core.modelos import PuntoEficiencia
 from bombas_prueba import COEF_JOROBA, bomba_tipo_a, bomba_tipo_b
 
 
@@ -147,3 +148,13 @@ def test_cuadro3_en_naranja(gestor):
     gestor.dibujar_resultado(evaluar_punto(gestor.bomba, 1500, 170, 738), color_fila(3, 0), "c3-f0")
     marcadores = [t for f in TIPOS for t in trazas(gestor.figura(f), "c3-f0") if t.mode == "markers"]
     assert len(marcadores) == 3 and all(t.marker.color in NARANJA for t in marcadores)
+
+
+def test_punto_de_maximo_rendimiento_en_negro_sin_guias():
+    b = bomba_tipo_b()
+    b.puntos_eficiencia.append(PuntoEficiencia(q=700, h=175, eta=85))
+    fig = GestorGraficas(b).figura(GRAFICA_ALTURA)
+    (marcador,) = [t for t in trazas(fig, META_CURVA) if t.mode == "markers"]
+    assert (marcador.x, marcador.y) == ((700,), (175,)) and marcador.marker.color == NEGRO
+    assert "85 %" in {a.text for a in fig.layout.annotations}
+    assert not [t for t in fig.data if t.line and t.line.dash == "dot"]  # sin líneas punteadas
