@@ -146,11 +146,25 @@ DIGITALIZAR = [
         "- **«Magnitud»**: qué es la curva (H, η, NPSH o P).\n"
         "- **«Diámetro impulsor (mm)»**: escribe el diámetro si la curva es de un impulsor concreto "
         "(por ejemplo **738**). Déjalo **vacío** si la curva vale para todos (por ejemplo, una única "
-        "curva de NPSH o de eficiencia).\n"
+        "curva de NPSH o de eficiencia). Ver el paso 3 si el gráfico tiene varios diámetros.\n"
         "- **«Grado»**: grado del polinomio. Deja **3**. Usa **4** si la curva tiene un máximo marcado "
         "(la eficiencia) o forma de S, y **2** si es casi recta.\n"
         "- Si la magnitud es **η**, elige **«η(Q) con su propio eje»** para una curva de eficiencia "
-        "normal (con su eje en %). La otra opción es para las curvas de igual rendimiento (paso 7).",
+        "normal (con su eje en %). La otra opción es para las curvas de igual rendimiento (paso 9).",
+    ),
+    Paso(
+        "Si el gráfico tiene varios diámetros de impulsor",
+        "Muchos fabricantes dibujan una curva de H **por cada diámetro** del impulsor (por ejemplo "
+        "768, 738 y 608 mm, con el diámetro escrito junto a la curva). Cada una se digitaliza **por "
+        "separado** y con **su diámetro** en **«Diámetro impulsor (mm)»**.\n\n"
+        "Para las demás magnitudes (η, NPSH, P), mira el gráfico:\n\n"
+        "- Si hay **una curva por diámetro** (por ejemplo, una potencia para 635 mm y otra para "
+        "508 mm), digitaliza cada una con **su diámetro**.\n"
+        "- Si hay **una sola curva** que vale para todos (lo habitual en el NPSH), digitalízala con el "
+        "diámetro **vacío**: las calculadoras la usarán para cualquier diámetro.\n\n"
+        "Escribe **exactamente el mismo número** en todas las curvas del mismo impulsor: 738 y 740 "
+        "serían dos diámetros distintos. En la lista **«Curvas "
+        "digitalizadas»** cada curva aparece con su diámetro («H – 738 mm») para que lo compruebes.",
     ),
     Paso(
         "Haz clic sobre la curva: principio y final",
@@ -182,10 +196,29 @@ DIGITALIZAR = [
         "- El **rango válido** (de qué Q a qué Q).\n"
         "- Avisos **⚠** si algo fue raro (un salto, un tramo no encontrado).\n\n"
         "Comprueba que la línea negra va **justo encima** del trazo original. Si en algún tramo se "
-        "separa o se va por otra curva, bórrala con la **papelera** y repítela con más clics donde "
-        "se desvió.",
+        "separa o se va por otra curva, tienes dos opciones:\n\n"
+        "- **Corregir solo ese tramo** con el lápiz ✏ de la curva (paso siguiente).\n"
+        "- Borrarla con la **papelera** 🗑 y repetirla con más clics donde se desvió.",
         "digitalizar_resultado.png",
         "Las tres curvas de altura ya digitalizadas, en negro sobre el original.",
+    ),
+    Paso(
+        "Corregir puntos a mano (lápiz ✏)",
+        "Sirve para arreglar un tramo sin repetir toda la curva, por ejemplo donde el programa se fue "
+        "por otra curva que se cruza.\n\n"
+        "1. En **«Curvas digitalizadas»** pulsa el **lápiz ✏** de la curva. Sus puntos aparecen en "
+        "**verde** sobre la imagen y la tarjeta «Nueva curva» se cambia por la de corrección.\n"
+        "2. Para **quitar** puntos, deja elegido **«Borrar puntos (zona)»**: haz **clic en una esquina** "
+        "de la zona con los puntos malos y **clic en la esquina opuesta**. Se borran los puntos que "
+        "queden dentro del rectángulo.\n"
+        "3. Para **añadir** puntos (por ejemplo, para rellenar el hueco), elige **«Añadir punto»** y haz "
+        "clic **sobre el trazo correcto**, un clic por punto.\n"
+        "4. Después de cada cambio la curva se **vuelve a ajustar** y verás el nuevo **R²**. Si te "
+        "equivocas, pulsa **«Deshacer»** (deshace los cambios uno a uno).\n"
+        "5. Pulsa **«Terminar corrección»**. En la lista, la curva queda marcada como «corregida a mano».\n\n"
+        "Si borras puntos de un **extremo**, el rango válido de la curva se acorta hasta los puntos que quedan.",
+        "digitalizar_correccion.png",
+        "Ejemplo: cuatro puntos que se fueron por encima del trazo, encerrados con dos clics para borrarlos.",
     ),
     Paso(
         "Repite con cada curva",
@@ -236,6 +269,21 @@ CALCULADORAS = [
         "Un punto de cada cuadro: morado (Cuadro 1), azul (Cuadro 2) y naranja (Cuadro 3).",
     ),
     Paso(
+        "El campo «Diámetro» de cada fila",
+        "Cada fila de los tres cuadros tiene un desplegable **«Diámetro»** con los diámetros que "
+        "digitalizaste (por ejemplo 608, 738 y 768 mm). Elige el **diámetro del impulsor de tu bomba**: "
+        "el cálculo usa la curva de H de ese diámetro.\n\n"
+        "- Para η, NPSH y P usa la curva de **ese mismo diámetro**; si no la hay, la curva única "
+        "digitalizada **sin diámetro**. Si tampoco existe, aparece el aviso «No hay curva de … para el "
+        "diámetro …» y ese valor sale como «—».\n"
+        "- El desplegable **empieza vacío**: hasta que elijas el diámetro, la fila muestra «Elige el "
+        "«Diámetro» de esta fila.» y no calcula nada. Así nunca se calcula con un impulsor que no es "
+        "el tuyo.\n"
+        "- Cada fila tiene su propio diámetro: puedes comparar diámetros con varias filas "
+        "(**«Agregar»**).\n"
+        "- Si ninguna curva tiene diámetro, el desplegable no aparece.",
+    ),
+    Paso(
         "Cuadro 1 (morado): conozco el caudal",
         "Escribe el caudal en **«Q»** y elige el **«Diámetro»**. Al momento aparecen **H, η, NPSH y P** "
         "para ese caudal, y el punto se dibuja en morado con líneas punteadas hasta los ejes.",
@@ -264,11 +312,19 @@ CALCULADORAS = [
 ]
 
 
-def mostrar(pasos: list[Paso], titulo: str = "Guía paso a paso") -> None:
-    """Guía desplegable (abierta al empezar) con un paso por fila y su imagen a la derecha."""
-    with ui.expansion(titulo, icon="menu_book", value=True).classes("w-full border rounded mb-2").props(
-        "header-class=text-base"
-    ):
+def mostrar(pasos: list[Paso], titulo: str = "Guía paso a paso", marca: str = "guia") -> None:
+    """Guía abierta al empezar, con un paso por fila y su imagen a la derecha.
+
+    El botón «Cerrar guía» la oculta y deja en su lugar «Abrir guía» para volver a verla.
+    """
+    abrir = ui.button("Abrir guía", icon="menu_book", on_click=lambda: ver(True)).props("outline").classes(
+        "mb-2"
+    ).mark(f"abrir-{marca}")
+    with ui.card().classes("w-full mb-2").mark(marca) as tarjeta:
+        with ui.row().classes("w-full items-center no-wrap"):
+            ui.icon("menu_book", size="sm")
+            ui.label(titulo).classes("text-base font-medium flex-grow")
+            ui.button("Cerrar guía", icon="close", on_click=lambda: ver(False)).props("flat").mark(f"cerrar-{marca}")
         for n, paso in enumerate(pasos, start=1):
             with ui.row().classes("w-full no-wrap items-start gap-4 py-3 border-t"):
                 ui.label(str(n)).classes(
@@ -279,6 +335,14 @@ def mostrar(pasos: list[Paso], titulo: str = "Guía paso a paso") -> None:
                     ui.markdown(paso.texto).classes("text-sm")
                 if paso.imagen:
                     _imagen(paso)
+        with ui.row().classes("w-full justify-end"):
+            ui.button("Cerrar guía", icon="close", on_click=lambda: ver(False)).props("flat")
+
+    def ver(abierta: bool) -> None:
+        tarjeta.set_visibility(abierta)
+        abrir.set_visibility(not abierta)
+
+    ver(True)
 
 
 def _imagen(paso: Paso) -> None:

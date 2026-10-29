@@ -101,7 +101,7 @@ def crear(ctx) -> None:
     estado = {"modo": None, "esquinas": [], "marcas": {}}  # marcas[eje] = {1: (x, y), 2: (x, y)}
     etiquetas_marca = {}  # (eje, k) → etiqueta con la posición de la marca en el formulario
 
-    guia.mostrar(guia.CALIBRAR, "Guía paso a paso: paneles, umbral y ejes")
+    guia.mostrar(guia.CALIBRAR, "Guía paso a paso: paneles, umbral y ejes", "guia-calibrar")
     with ui.row().classes("w-full no-wrap items-start gap-4"):
         with ui.column().classes("w-3/5"):
             ayuda = ui.label("Carga primero un archivo.").classes("text-sm text-gray-700")

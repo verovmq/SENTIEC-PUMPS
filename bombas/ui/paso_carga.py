@@ -16,7 +16,7 @@ def crear(ctx) -> None:
 
     archivo = {"datos": None, "nombre": ""}
 
-    guia.mostrar(guia.CARGAR, "Guía paso a paso: cargar el archivo")
+    guia.mostrar(guia.CARGAR, "Guía paso a paso: cargar el archivo", "guia-cargar")
     ui.label("Carga el PDF o la imagen con las curvas del fabricante.").classes("text-gray-700")
     with ui.row().classes("items-end gap-4"):
         subida = ui.upload(label="PDF o imagen", auto_upload=True, max_files=1)

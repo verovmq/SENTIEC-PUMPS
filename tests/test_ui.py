@@ -10,7 +10,7 @@ import re
 from pathlib import Path
 
 import pytest
-from nicegui import ui
+from nicegui import ElementFilter, ui
 from nicegui.elements.upload_files import SmallFileUpload
 from nicegui.testing import User
 
@@ -45,6 +45,12 @@ async def calibrar(user: User, eje: str, titulo: str, unidad: str, punto1, valor
     user.find(marker=f"guardar-{eje}").click()
     await user.should_see(f"Eje {eje} calibrado ({unidad})")
     await user.should_see(f"{titulo}  ✔ {unidad}")  # el formulario se redibuja (en segundo plano)
+
+
+def visible(user: User, marca: str) -> bool:
+    with user.client:  # user.find no ve los elementos ocultos
+        (e,) = ElementFilter(marker=marca, only_visible=False)
+    return e.visible
 
 
 def resultado(user: User, marca: str) -> str:
@@ -97,11 +103,17 @@ async def test_deslizante_del_umbral_con_vista_previa_en_vivo(user_con_curva: Us
 async def test_calculadoras(user_con_curva: User):
     user = user_con_curva
     elemento(user, "c1-q-0").value = 2000
+    # El diámetro empieza vacío: sin elegirlo no se calcula ni se dibuja nada.
+    assert elemento(user, "c1-diametro-0").value is None
+    assert "Elige el" in resultado(user, "c1-resultado-0") and "c1-f0" not in marcadores_altura(user)
+    elemento(user, "c1-diametro-0").value = 738
     h = float(re.search(r"H = ([\d.]+)", resultado(user, "c1-resultado-0")).group(1))
     assert h == pytest.approx(175.26, abs=1)  # Excel V6: H(2000) = 175,26 m
+    elemento(user, "c2-diametro-0").value = 738
     elemento(user, "c2-h-0").value = 175.3
     q = float(re.search(r"Q = ([\d.]+)", resultado(user, "c2-resultado-0")).group(1))
     assert q == pytest.approx(2000, abs=15)  # Excel V6: H(2000) = 175,26 m
+    elemento(user, "c3-diametro-0").value = 738
     elemento(user, "c3-q-0").value = 1925
     elemento(user, "c3-h-0").value = 180
     assert "Por encima de la curva" in resultado(user, "c3-resultado-0")
@@ -111,6 +123,7 @@ async def test_calculadoras(user_con_curva: User):
 
     # «Agregar» añade una fila con el siguiente tono; quitar una fila borra sus puntos.
     user.find(marker="agregar-c1").click()
+    elemento(user, "c1-diametro-1").value = 738
     elemento(user, "c1-q-1").value = 1200
     assert marcadores_altura(user)["c1-f1"] == MORADO[1]
     user.find(marker="quitar-c1-0").click()
@@ -119,6 +132,7 @@ async def test_calculadoras(user_con_curva: User):
 
 async def test_cuadro2_altura_inalcanzable(user_con_curva: User):
     user = user_con_curva
+    elemento(user, "c2-diametro-0").value = 738
     elemento(user, "c2-h-0").value = 400
     assert "no se alcanza" in resultado(user, "c2-resultado-0")
 
@@ -136,3 +150,28 @@ async def test_errores_se_muestran_como_aviso(user_con_curva: User):
     user = user_con_curva
     user.find(marker="digitalizar").click()  # sin clics sobre la curva
     await user.should_see("Haz al menos 2 clics")
+
+
+async def test_corregir_puntos_a_mano(user_con_curva: User):
+    user = user_con_curva
+    sesion_curva = lambda: elemento(user, "info-correccion").text  # noqa: E731
+    user.find(marker="corregir-curva-0").click()
+    await user.should_see("Corrigiendo puntos: H – 738 mm")
+    assert visible(user, "tarjeta-correccion") and not visible(user, "tarjeta-nueva-curva")
+    n_antes = int(sesion_curva().split()[0])
+    # Borrar el final de la curva (x > 500) con dos clics en esquinas opuestas.
+    clic(user, "lienzo-digitalizar", 500, 300)
+    await user.should_see("esquina opuesta")
+    clic(user, "lienzo-digitalizar", 600, 500)
+    await user.should_see("borrado(s)")
+    n_despues = int(sesion_curva().split()[0])
+    assert 0 < n_despues < n_antes
+    await user.should_see("corregida a mano")
+    # «Deshacer» recupera los puntos; «Añadir punto» añade uno con un clic.
+    user.find(marker="deshacer-correccion").click()
+    assert int(sesion_curva().split()[0]) == n_antes
+    elemento(user, "accion-correccion").value = "anadir"
+    clic(user, "lienzo-digitalizar", 300, 370)
+    assert int(sesion_curva().split()[0]) == n_antes + 1
+    user.find(marker="terminar-correccion").click()
+    assert not visible(user, "tarjeta-correccion") and visible(user, "tarjeta-nueva-curva")

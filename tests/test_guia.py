@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 
 import pytest
-from nicegui import ui
+from nicegui import ElementFilter, ui
 from nicegui.testing import User
 
 from bombas.ui import guia
@@ -49,3 +49,17 @@ async def test_cada_pestana_muestra_su_guia(user: User):
     for titulo in ("cargar el archivo", "paneles, umbral y ejes", "digitalizar curvas", "gráficas y calculadoras"):
         await user.should_see(f"Guía paso a paso: {titulo}")
     await user.should_see("Nuevo panel")
+
+
+async def test_cerrar_y_abrir_la_guia(user: User):
+    ui.page("/")(pagina)
+    await user.open("/")
+    with user.client:  # user.find no ve los elementos ocultos
+        (tarjeta,) = ElementFilter(marker="guia-calibrar", only_visible=False)
+        (abrir,) = ElementFilter(marker="abrir-guia-calibrar", only_visible=False)
+    assert tarjeta.visible and not abrir.visible  # abierta al empezar
+    user.find(marker="cerrar-guia-calibrar").click()
+    assert not tarjeta.visible and abrir.visible
+    assert user.find(marker="guia-digitalizar").elements.pop().visible  # las demás pestañas no cambian
+    user.find(marker="abrir-guia-calibrar").click()
+    assert tarjeta.visible and not abrir.visible

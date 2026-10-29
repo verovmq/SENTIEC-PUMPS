@@ -23,14 +23,17 @@ MAGNITUDES = {
 }
 TIPO_FUNCION = "funcion"
 TIPO_ISO = "iso"
+ACCION_BORRAR = "borrar"
+ACCION_ANADIR = "anadir"
 
 
 def crear(ctx) -> None:
     from bombas.ui.app import proteger
 
-    estado = {"semillas": [], "modo": "semillas"}  # modo: "semillas" o "maximo"
+    # modo: "semillas", "maximo" o "corregir" (corrección manual de la curva `corrigiendo`).
+    estado = {"semillas": [], "modo": "semillas", "corrigiendo": None, "esquina": None}
 
-    guia.mostrar(guia.DIGITALIZAR, "Guía paso a paso: digitalizar curvas")
+    guia.mostrar(guia.DIGITALIZAR, "Guía paso a paso: digitalizar curvas", "guia-digitalizar")
     with ui.row().classes("w-full no-wrap items-start gap-4"):
         with ui.column().classes("w-3/5"):
             ayuda = ui.label().classes("text-sm text-gray-700")
@@ -38,7 +41,25 @@ def crear(ctx) -> None:
         with ui.column().classes("w-2/5"):
             selector_panel(ctx)
             control_umbral(ctx, "umbral-digitalizar")
-            with ui.card().classes("w-full"):
+            with ui.card().classes("w-full").style(f"border: 2px solid {AYUDA}").mark("tarjeta-correccion") as tarjeta_correccion:
+                titulo_correccion = ui.label().classes("font-medium")
+                ui.label(
+                    "Los puntos digitalizados se ven en verde. Quita los que se fueron por otra curva "
+                    "o añade puntos sobre el trazo correcto; la curva se vuelve a ajustar en cada cambio."
+                ).classes("text-sm text-gray-600")
+                accion = ui.toggle(
+                    {ACCION_BORRAR: "Borrar puntos (zona)", ACCION_ANADIR: "Añadir punto"}, value=ACCION_BORRAR,
+                    on_change=lambda: cambiar_accion(),
+                ).mark("accion-correccion")
+                info_correccion = ui.label().classes("text-sm").mark("info-correccion")
+                with ui.row().classes("gap-2"):
+                    ui.button("Deshacer", icon="undo", on_click=lambda: deshacer()).props("outline dense").mark(
+                        "deshacer-correccion"
+                    )
+                    ui.button("Terminar corrección", icon="check", on_click=lambda: terminar_correccion()).props(
+                        "dense"
+                    ).mark("terminar-correccion")
+            with ui.card().classes("w-full").mark("tarjeta-nueva-curva") as tarjeta_nueva:
                 ui.label("Nueva curva").classes("font-medium")
                 magnitud = ui.select(MAGNITUDES, value=Magnitud.ALTURA, label="Magnitud").classes("w-full")
                 tipo = ui.radio(
@@ -82,7 +103,21 @@ def crear(ctx) -> None:
         tarjeta_maximo.set_visibility(any(c.ajustada.es_iso_eficiencia for c in ctx.sesion.curvas))
         n = len(estado["semillas"])
         contador.text = f"{n} clic(s) sobre la curva" + (" — haz al menos 2" if n < 2 else "")
-        if estado["modo"] == "maximo":
+        corrigiendo = estado["modo"] == "corregir"
+        tarjeta_correccion.set_visibility(corrigiendo)
+        tarjeta_nueva.set_visibility(not corrigiendo)
+        if corrigiendo:
+            c = ctx.sesion.curvas[estado["corrigiendo"]]
+            a = c.ajustada
+            titulo_correccion.text = f"Corrigiendo puntos: {a.etiqueta}"
+            info_correccion.text = f"{len(c.digitalizada.x)} puntos · R² = {a.r2:.4f}"
+            if accion.value == ACCION_ANADIR:
+                ayuda.text = "Haz clic sobre el trazo correcto de la curva para añadir un punto."
+            elif estado["esquina"] is None:
+                ayuda.text = "Haz clic en una esquina de la zona con los puntos que quieres borrar."
+            else:
+                ayuda.text = "Ahora haz clic en la esquina opuesta de la zona: se borran los puntos que queden dentro."
+        elif estado["modo"] == "maximo":
             ayuda.text = "Haz clic sobre el punto de máximo rendimiento del gráfico."
         elif ctx.panel_activo is None:
             ayuda.text = "Define y calibra primero un panel en «2. Calibrar»."
@@ -103,7 +138,55 @@ def crear(ctx) -> None:
             partes.append(lienzo.polilinea(c.trazado, NEGRO))
         for i, (x, y) in enumerate(estado["semillas"], start=1):
             partes.append(lienzo.marca(x, y, AYUDA, str(i)))
+        if estado["modo"] == "corregir":
+            partes.append(lienzo.puntos(s.puntos_curva(estado["corrigiendo"])))
+            if estado["esquina"] is not None:
+                partes.append(lienzo.marca(*estado["esquina"], AYUDA, "esquina 1"))
         lienzo.dibujar("".join(partes))
+
+    def corregir(i: int) -> None:
+        c = ctx.sesion.curvas[i]
+        if ctx.panel_activo != c.panel:
+            ctx.panel_activo = c.panel
+            ctx.emitir("paneles")  # reinicia el modo; después se entra en corrección
+        estado.update(modo="corregir", corrigiendo=i, esquina=None, semillas=[])
+        accion.value = ACCION_BORRAR
+        refrescar()
+
+    def terminar_correccion() -> None:
+        estado.update(modo="semillas", corrigiendo=None, esquina=None)
+        refrescar()
+
+    def cambiar_accion() -> None:
+        estado["esquina"] = None
+        if estado["modo"] == "corregir":
+            actualizar_formulario()
+            dibujar()
+
+    @proteger
+    def deshacer() -> None:
+        ctx.sesion.deshacer_edicion(estado["corrigiendo"])
+        ctx.emitir("curvas")
+
+    def clic_correccion(x: float, y: float) -> None:
+        i = estado["corrigiendo"]
+        if accion.value == ACCION_ANADIR:
+            q, v = ctx.sesion.agregar_punto_curva(i, (x, y))
+            ui.notify(f"Punto añadido: Q = {q:.4g}, {v:.4g}.", type="positive")
+        elif estado["esquina"] is None:
+            estado["esquina"] = (x, y)
+            actualizar_formulario()
+            dibujar()
+            return
+        else:
+            esquina, estado["esquina"] = estado["esquina"], None
+            try:
+                n = ctx.sesion.quitar_puntos_curva(i, esquina, (x, y))
+            finally:
+                actualizar_formulario()
+                dibujar()
+            ui.notify(f"{n} punto(s) borrado(s). La curva se ha vuelto a ajustar.", type="positive")
+        ctx.emitir("curvas")
 
     def borrar_semillas() -> None:
         estado["semillas"] = []
@@ -121,6 +204,9 @@ def crear(ctx) -> None:
     def al_clic(x: float, y: float) -> None:
         if ctx.panel_activo is None:
             ui.notify("Define y calibra primero un panel en «2. Calibrar».", type="warning")
+            return
+        if estado["modo"] == "corregir":
+            clic_correccion(x, y)
             return
         if estado["modo"] == "maximo":
             estado["modo"] = "semillas"
@@ -171,10 +257,16 @@ def crear(ctx) -> None:
                     ui.label(f"{a.etiqueta} · {s.paneles[c.panel].nombre}").classes("text-sm font-medium")
                     ui.label(
                         f"grado {a.grado} · R² = {a.r2:.4f} · válida en {variable} ∈ [{a.x_min:.4g}, {a.x_max:.4g}] {unidad}"
+                        + (" · corregida a mano" if c.editada else "")
                     ).classes("text-xs text-gray-600")
                     for aviso in c.avisos:
                         ui.label(f"⚠ {aviso}").classes("text-xs text-amber-800")
-                ui.button(icon="delete", on_click=lambda i=i: quitar(i)).props("flat dense round")
+                ui.button(icon="edit", on_click=lambda i=i: corregir(i)).props("flat dense round").tooltip(
+                    "Corregir puntos"
+                ).mark(f"corregir-curva-{i}")
+                ui.button(icon="delete", on_click=lambda i=i: quitar(i)).props("flat dense round").tooltip(
+                    "Borrar curva"
+                )
         for i, p in enumerate(s.puntos_eficiencia):
             with ui.row().classes("w-full items-center no-wrap gap-2 border-b py-1"):
                 ui.label(f"Máximo η {p.eta:g} % en Q={p.q:.4g}, H={p.h:.4g}").classes("text-sm flex-grow")
@@ -182,6 +274,8 @@ def crear(ctx) -> None:
 
     def quitar(i: int) -> None:
         ctx.sesion.quitar_curva(i)
+        if estado["modo"] == "corregir":  # los índices cambian: se termina la corrección
+            estado.update(modo="semillas", corrigiendo=None, esquina=None)
         ctx.emitir("curvas")
 
     def quitar_maximo(i: int) -> None:
@@ -194,7 +288,7 @@ def crear(ctx) -> None:
         dibujar()
 
     def al_cambiar_panel() -> None:
-        estado.update(semillas=[], modo="semillas")
+        estado.update(semillas=[], modo="semillas", corrigiendo=None, esquina=None)
         refrescar()
 
     with lista:

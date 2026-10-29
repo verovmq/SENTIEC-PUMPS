@@ -14,7 +14,7 @@ calibrar (las del gráfico original) y no se convierten.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -73,6 +73,16 @@ class CurvaRegistrada:
     ajustada: CurvaAjustada
     avisos: list[str]
     trazado: np.ndarray  # (N, 2) píxeles del polinomio ajustado, para superponerlo a la imagen
+    editada: bool = False  # se quitaron o añadieron puntos a mano
+    historial: list[tuple] = field(default_factory=list, repr=False)  # estados anteriores, para deshacer
+
+
+def _trazado(ajustada: CurvaAjustada, eje_x: Eje, eje_y: Eje) -> np.ndarray:
+    """Polinomio ajustado en píxeles de la imagen, para dibujarlo sobre el original."""
+    t = np.linspace(ajustada.x_min, ajustada.x_max, PUNTOS_TRAZADO)
+    v = ajustada.evaluar(t)
+    q, y = (t, v) if ajustada.funcion_de == "x" else (v, t)
+    return np.column_stack([pixel_desde_valor(eje_x, q), pixel_desde_valor(eje_y, y)])
 
 
 def _grupo(cuadro: int, fila: int) -> str:
@@ -198,14 +208,74 @@ class Sesion:
             funcion_de=funcion_de, nivel=nivel, rama=rama,
         )
         ajustada = ajustar(curva, grado, eje_x.unidad, eje_y.unidad)
-        t = np.linspace(ajustada.x_min, ajustada.x_max, PUNTOS_TRAZADO)
-        v = ajustada.evaluar(t)
-        q, y = (t, v) if funcion_de == "x" else (v, t)
-        trazado = np.column_stack([pixel_desde_valor(eje_x, q), pixel_desde_valor(eje_y, y)])
+        trazado = _trazado(ajustada, eje_x, eje_y)
         registrada = CurvaRegistrada(panel, [tuple(map(float, s)) for s in semillas], curva, ajustada, avisos, trazado)
         self.curvas.append(registrada)
         self.actualizar_graficas()
         return registrada
+
+    # --- corrección manual de puntos ---------------------------------------------------
+    # Tras digitalizar, el usuario puede quitar los puntos de una zona (p. ej. un tramo
+    # que se fue por otra curva) o añadir puntos con clics. Cada cambio vuelve a ajustar
+    # el polinomio con el mismo grado; el rango válido pasa a ser el de los puntos que
+    # quedan. Los cambios se pueden deshacer uno a uno.
+
+    def _ejes_curva(self, c: CurvaRegistrada) -> tuple[Eje, Eje]:
+        eje_y = "H" if c.ajustada.es_iso_eficiencia else EJE_DE_MAGNITUD[c.ajustada.magnitud]
+        return self._eje(c.panel, EJE_CAUDAL), self._eje(c.panel, eje_y)
+
+    def puntos_curva(self, indice: int) -> np.ndarray:
+        """Puntos digitalizados de una curva, en píxeles de la imagen (N, 2)."""
+        c = self.curvas[indice]
+        eje_x, eje_y = self._ejes_curva(c)
+        d = c.digitalizada
+        return np.column_stack([pixel_desde_valor(eje_x, d.x), pixel_desde_valor(eje_y, d.y)])
+
+    def _reajustar(self, indice: int, x: np.ndarray, y: np.ndarray) -> None:
+        """Sustituye los puntos de la curva y la vuelve a ajustar (solo si el ajuste es posible)."""
+        c = self.curvas[indice]
+        eje_x, eje_y = self._ejes_curva(c)
+        orden = np.argsort(x if c.digitalizada.funcion_de == "x" else y)
+        digitalizada = replace(c.digitalizada, x=np.asarray(x)[orden], y=np.asarray(y)[orden])
+        try:
+            ajustada = ajustar(digitalizada, c.ajustada.grado, eje_x.unidad, eje_y.unidad)
+        except ValueError as e:
+            raise ValueError(f"No se puede ajustar la curva con los puntos que quedarían: {e}") from e
+        c.historial.append((c.digitalizada, c.ajustada, c.avisos, c.trazado, c.editada))
+        c.digitalizada, c.ajustada, c.trazado = digitalizada, ajustada, _trazado(ajustada, eje_x, eje_y)
+        c.avisos, c.editada = [], True  # los avisos del seguimiento ya no describen estos puntos
+        self.actualizar_graficas()
+
+    def quitar_puntos_curva(self, indice: int, esquina1, esquina2) -> int:
+        """Quita los puntos de la curva dentro del rectángulo de dos esquinas (píxeles). Devuelve cuántos."""
+        (xa, ya), (xb, yb) = esquina1, esquina2
+        px = self.puntos_curva(indice)
+        dentro = (
+            (px[:, 0] >= min(xa, xb)) & (px[:, 0] <= max(xa, xb))
+            & (px[:, 1] >= min(ya, yb)) & (px[:, 1] <= max(ya, yb))
+        )
+        if not dentro.any():
+            raise ValueError("No hay puntos de la curva dentro de esa zona.")
+        d = self.curvas[indice].digitalizada
+        self._reajustar(indice, d.x[~dentro], d.y[~dentro])
+        return int(dentro.sum())
+
+    def agregar_punto_curva(self, indice: int, punto) -> tuple[float, float]:
+        """Añade a la curva el punto de un clic (píxeles). Devuelve sus valores (Q, y)."""
+        c = self.curvas[indice]
+        eje_x, eje_y = self._ejes_curva(c)
+        q = float(valor_desde_pixel(eje_x, punto[0]))
+        v = float(valor_desde_pixel(eje_y, punto[1]))
+        d = c.digitalizada
+        self._reajustar(indice, np.append(d.x, q), np.append(d.y, v))
+        return q, v
+
+    def deshacer_edicion(self, indice: int) -> None:
+        c = self.curvas[indice]
+        if not c.historial:
+            raise ValueError("No hay cambios que deshacer en esta curva.")
+        c.digitalizada, c.ajustada, c.avisos, c.trazado, c.editada = c.historial.pop()
+        self.actualizar_graficas()
 
     def quitar_curva(self, indice: int) -> None:
         del self.curvas[indice]

@@ -135,3 +135,49 @@ def test_enderezar_antes_de_los_paneles(sesion):
     original = s.imagen.copy()
     assert abs(s.enderezar()) < ANGULO_MINIMO  # imagen recta: no se toca
     assert s.angulo == 0 and np.array_equal(s.imagen, original)
+
+
+# --- corrección manual de puntos ----------------------------------------------------------
+
+
+def test_quitar_puntos_que_se_fueron_por_otra_curva(sesion):
+    original = sesion.curvas[0].ajustada
+    px = sesion.puntos_curva(0)
+    xs = np.array([380, 400, 420, 440])
+    y_738 = np.interp(xs, px[:, 0], px[:, 1])
+    # Simula un tramo mal seguido: puntos 40 px por encima, como si se hubiera ido por otra curva.
+    for x, y in zip(xs, y_738 - 40):
+        sesion.agregar_punto_curva(0, (x, y))
+    mala = sesion.curvas[0].ajustada
+    assert mala.r2 < original.r2 and sesion.curvas[0].editada
+    # Un rectángulo alrededor de esos puntos (sin tocar la curva buena) los quita y el ajuste vuelve a ser el original.
+    assert sesion.quitar_puntos_curva(0, (375, y_738.min() - 45), (445, y_738.max() - 32)) == 4
+    np.testing.assert_allclose(sesion.curvas[0].ajustada.evaluar([500, 1500, 2500]), original.evaluar([500, 1500, 2500]), atol=0.05)
+
+
+def test_quitar_un_extremo_acorta_el_rango_valido_y_se_puede_deshacer(sesion):
+    c = sesion.curvas[0]
+    q_max = c.ajustada.x_max
+    n = sesion.quitar_puntos_curva(0, (500, 300), (600, 500))  # el final de la curva (Q > ~2300)
+    assert n > 0 and c.ajustada.x_max < q_max - 300
+    assert len(c.trazado) and c.trazado[:, 0].max() < 500  # el dibujo sobre la imagen también se acorta
+    sesion.deshacer_edicion(0)
+    assert c.ajustada.x_max == q_max and not c.editada
+    with pytest.raises(ValueError, match="deshacer"):
+        sesion.deshacer_edicion(0)
+
+
+def test_quitar_puntos_zona_vacia_o_sin_puntos_suficientes(sesion):
+    c = sesion.curvas[0]
+    antes = c.ajustada
+    with pytest.raises(ValueError, match="No hay puntos"):
+        sesion.quitar_puntos_curva(0, (600, 700), (700, 750))
+    with pytest.raises(ValueError, match="No se puede ajustar"):
+        sesion.quitar_puntos_curva(0, (100, 200), (710, 760))  # toda la curva
+    assert c.ajustada is antes and c.historial == []  # nada cambió
+
+
+def test_puntos_curva_en_pixeles_sobre_el_trazo(sesion):
+    px = sesion.puntos_curva(0)
+    assert px.shape[1] == 2 and len(px) >= 20
+    assert px[:, 0].min() == pytest.approx(120, abs=3) and px[:, 0].max() == pytest.approx(577, abs=3)

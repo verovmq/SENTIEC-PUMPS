@@ -222,6 +222,23 @@ def imagenes_digitalizar(img: np.ndarray) -> None:
     d.rotulo(300, 20, "En negro: lo que digitalizó el programa.\nDebe ir justo encima del trazo original.", hacia=(400, y_en(trazados[768], 400)))
     d.guardar("digitalizar_resultado.png")
 
+    # Corrección manual: puntos en verde; cuatro de ellos fuera del trazo, dentro de la zona a borrar.
+    indice = next(i for i, c in enumerate(s.curvas) if c.ajustada.diametro == 738)
+    buenos = s.puntos_curva(indice)
+    xs = np.array([380, 400, 420, 440])
+    malos = np.column_stack([xs, np.interp(xs, buenos[:, 0], buenos[:, 1]) - 40])
+    d = Dibujo(img, (60, 230, 720, 640), atenuada=True)
+    for x, y in np.vstack([buenos, malos]):
+        cx, cy = d.p(x, y)
+        d.d.ellipse((cx - 4, cy - 4, cx + 4, cy + 4), fill=VERDE)
+    esquina1, esquina2 = (372, malos[:, 1].min() - 10), (448, malos[:, 1].max() + 8)
+    d.rect((*esquina1, *esquina2))
+    d.clic(*esquina1, 1)
+    d.clic(*esquina2, 2)
+    d.rotulo(20, 20, "«Borrar puntos (zona)»: clic 1 en una esquina\ny clic 2 en la esquina opuesta", hacia=esquina1)
+    d.rotulo(420, 330, "Puntos verdes: los puntos digitalizados", hacia=tuple(buenos[len(buenos) * 3 // 4]))
+    d.guardar("digitalizar_correccion.png")
+
 
 def imagenes_er3407(img: np.ndarray) -> None:
     # Curva de igual rendimiento de 75 %: dos ramas, cada una con clics de abajo arriba.

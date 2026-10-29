@@ -86,6 +86,11 @@ class Lienzo:
         )
         return f'<circle cx="{x}" cy="{y}" r="{r}" fill="none" stroke="{color}" stroke-width="{1.5 * self._escala}"/>' + texto
 
+    def puntos(self, puntos: np.ndarray, color: str = AYUDA) -> str:
+        """Puntos digitalizados como círculos rellenos pequeños (corrección manual)."""
+        r = 2.5 * self._escala
+        return "".join(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r}" fill="{color}"/>' for x, y in puntos)
+
     def polilinea(self, puntos: np.ndarray, color: str = NEGRO) -> str:
         coordenadas = " ".join(f"{x:.1f},{y:.1f}" for x, y in puntos)
         return (

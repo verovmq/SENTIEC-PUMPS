@@ -90,7 +90,9 @@ class Fila:
                             self.q = ui.number(f"Q ({q_u})" if q_u else "Q").classes("w-28").mark(f"c{cuadro.numero}-q-{indice}")
                         if cuadro.numero in (CUADRO_CAUDAL, CUADRO_PUNTO):
                             self.h = ui.number(f"H ({h_u})" if h_u else "H").classes("w-28").mark(f"c{cuadro.numero}-h-{indice}")
-                        self.diametro = ui.select({}, label="Diámetro").classes("w-32")
+                        self.diametro = ui.select({}, label="Diámetro").classes("w-32").mark(
+                            f"c{cuadro.numero}-diametro-{indice}"
+                        )
                     self.resultado = ui.column().classes("gap-0").mark(f"c{cuadro.numero}-resultado-{indice}")
                 ui.button(icon="close", on_click=self.quitar).props("flat dense round").mark(
                     f"quitar-c{cuadro.numero}-{indice}"
@@ -106,7 +108,8 @@ class Fila:
         self.diametro.update()
         self.diametro.set_visibility(bool(diametros))
         if self.diametro.value not in diametros:
-            self.diametro.value = diametros[-1] if diametros else None
+            # Empieza vacío: el usuario elige el diámetro de su impulsor (no se supone ninguno).
+            self.diametro.value = None
 
     def _mostrar(self, lineas: list[tuple[str, str]]) -> None:
         self.resultado.clear()
@@ -118,9 +121,11 @@ class Fila:
         ctx, n = self.cuadro.ctx, self.cuadro.numero
         q = self.q.value if self.q else None
         h = self.h.value if self.h else None
-        if (self.q and q is None) or (self.h and h is None):
+        falta_diametro = bool(ctx.sesion.diametros()) and self.diametro.value is None
+        if (self.q and q is None) or (self.h and h is None) or falta_diametro:
             ctx.sesion.quitar_fila(n, self.indice)
-            self._mostrar([])
+            hay_datos = (self.q is None or q is not None) and (self.h is None or h is not None)
+            self._mostrar([("Elige el «Diámetro» de esta fila.", "text-amber-800")] if hay_datos else [])
             self.cuadro.refrescar_graficas()
             return
         try:
@@ -167,7 +172,7 @@ class Cuadro:
 def crear(ctx) -> None:
     graficas = []
 
-    guia.mostrar(guia.CALCULADORAS, "Guía paso a paso: gráficas y calculadoras")
+    guia.mostrar(guia.CALCULADORAS, "Guía paso a paso: gráficas y calculadoras", "guia-calculadoras")
     def refrescar_graficas() -> None:
         for g in graficas:
             g.update()
