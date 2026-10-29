@@ -181,3 +181,38 @@ def test_puntos_curva_en_pixeles_sobre_el_trazo(sesion):
     px = sesion.puntos_curva(0)
     assert px.shape[1] == 2 and len(px) >= 20
     assert px[:, 0].min() == pytest.approx(120, abs=3) and px[:, 0].max() == pytest.approx(577, abs=3)
+
+
+# --- borrar paneles -----------------------------------------------------------------------
+
+
+def test_quitar_panel_borra_sus_curvas_y_conserva_las_de_otros(sesion):
+    arriba = sesion.agregar_panel((115, 31), (707, 217))  # panel de potencia
+    sesion.calibrar_eje(arriba, "Q", "m³/h", (115, 0), 0, (707, 0), 3500)
+    sesion.calibrar_eje(arriba, "P", "kW", (0, 217), 0, (0, 31.5), 1500)
+    sesion.digitalizar_curva(arriba, [(118, 161.5), (578, 56.5)], Magnitud.POTENCIA)
+    assert [p.nombre for p in sesion.paneles] == ["Panel 1", "Panel 2"]
+
+    assert sesion.quitar_panel(0) == 1  # el panel 1 tenía la curva de 738 mm
+    assert [p.nombre for p in sesion.paneles] == ["Panel 2"]
+    (potencia,) = sesion.curvas
+    assert potencia.panel == 0 and potencia.ajustada.magnitud == Magnitud.POTENCIA
+    assert len(sesion.puntos_curva(0)) > 0  # sigue usando los ejes de su panel
+    # Un panel nuevo no repite el nombre de uno existente.
+    assert sesion.paneles[sesion.agregar_panel((115, 239), (707, 758))].nombre == "Panel 3"
+
+
+def test_quitar_panel_de_igual_rendimiento_borra_los_puntos_de_maximo():
+    s = Sesion()
+    s.cargar((DATOS / "er3407.png").read_bytes(), "er3407.png")
+    p = s.agregar_panel((65, 15), (895, 504))
+    s.fijar_umbral(p, 150)
+    s.calibrar_eje(p, "Q", "m³/h", (168.5, 0), 200, (687.5, 0), 1200)
+    s.calibrar_eje(p, "H", "m", (0, 297.5), 50, (0, 38.5), 300)
+    coef, h0, h1 = ISO_XLS[(80, Rama.DERECHA)]
+    margen = 0.06 * (h1 - h0)
+    semillas = [semilla(np.polyval(polinomio(coef), h), h) for h in (h0 + margen, h1 - margen)]
+    s.digitalizar_curva(p, semillas, Magnitud.EFICIENCIA, nivel=80, rama=Rama.DERECHA, grado=2)
+    s.agregar_punto_eficiencia(p, (490.5, 121.4), 81)
+    assert s.quitar_panel(p) == 1
+    assert s.paneles == [] and s.curvas == [] and s.puntos_eficiencia == []

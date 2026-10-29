@@ -6,7 +6,7 @@ negro: así se ve de un vistazo si el ajuste sigue el trazo original.
 
 from __future__ import annotations
 
-from nicegui import ui
+from nicegui import run, ui
 
 from bombas.core.ajuste import GRADO_MAXIMO, GRADO_MINIMO, GRADO_POR_DEFECTO
 from bombas.core.modelos import Magnitud, Rama
@@ -222,7 +222,7 @@ def crear(ctx) -> None:
         dibujar()
 
     @proteger
-    def digitalizar() -> None:
+    async def digitalizar() -> None:
         if ctx.panel_activo is None:
             raise ValueError("Define y calibra primero un panel en «2. Calibrar».")
         if len(estado["semillas"]) < 2:
@@ -230,10 +230,17 @@ def crear(ctx) -> None:
         iso = es_iso()
         if iso and nivel.value is None:
             raise ValueError("Escribe el η de la curva de igual rendimiento.")
-        c = ctx.sesion.digitalizar_curva(
-            ctx.panel_activo, estado["semillas"], magnitud.value, diametro.value, int(grado.value),
-            nivel=nivel.value if iso else None, rama=rama.value if iso else None,
-        )
+        # En segundo plano: en imágenes grandes la máscara completa tarda unos segundos y la
+        # página debe seguir respondiendo.
+        aviso = ui.notification("Digitalizando la curva…", spinner=True, timeout=None)
+        try:
+            c = await run.io_bound(
+                ctx.sesion.digitalizar_curva,
+                ctx.panel_activo, list(estado["semillas"]), magnitud.value, diametro.value, int(grado.value),
+                nivel=nivel.value if iso else None, rama=rama.value if iso else None,
+            )
+        finally:
+            aviso.dismiss()
         estado["semillas"] = []
         a = c.ajustada
         if c.avisos:

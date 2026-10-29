@@ -12,6 +12,7 @@ Cada pestaña del navegador es una sesión independiente con su propio estado.
 
 from __future__ import annotations
 
+import inspect
 from collections import defaultdict
 from collections.abc import Callable
 from functools import wraps
@@ -48,6 +49,16 @@ class Contexto:
 
 def proteger(funcion):
     """Muestra los errores de validación como aviso en vez de romper la página."""
+    if inspect.iscoroutinefunction(funcion):
+
+        @wraps(funcion)
+        async def envoltura_asincrona(*args, **kwargs):
+            try:
+                return await funcion(*args, **kwargs)
+            except ValueError as e:
+                ui.notify(str(e), type="warning", multi_line=True)
+
+        return envoltura_asincrona
 
     @wraps(funcion)
     def envoltura(*args, **kwargs):
@@ -85,4 +96,7 @@ def pagina() -> None:
 
 def main() -> None:
     # Solo accesible desde este equipo (por defecto NiceGUI escucha en toda la red local).
-    ui.run(title=TITULO, language="es", host="127.0.0.1", port=8080, reload=False, show=True)
+    # reconnect_timeout: si la conexión con el navegador se corta (equipo ocupado, suspensión),
+    # NiceGUI espera este tiempo antes de dar la sesión por perdida y recargar la página
+    # (lo que borra el trabajo). Por defecto son 3 s; se amplía a 30 s.
+    ui.run(title=TITULO, language="es", host="127.0.0.1", port=8080, reload=False, show=True, reconnect_timeout=30)

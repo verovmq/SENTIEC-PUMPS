@@ -205,6 +205,18 @@ def imagenes_digitalizar(img: np.ndarray) -> None:
     d.rotulo(330, 330, "Clic 2: al final de la curva", hacia=(575, 455))
     d.guardar("digitalizar_clics.png")
 
+    # Varios diámetros en la misma gráfica: cada curva con sus dos clics y su diámetro.
+    d = Dibujo(img, (60, 230, 720, 640))
+    rotulos = {768: (330, 15), 738: (300, 275), 608: (60, 360)}
+    for diametro, semillas in ((768, [(118, 300.5), (600, 426)]), (738, [(120, 334.5), (577, 452)]),
+                               (608, [(118, 465.5), (489, 561)])):
+        (x1, y1), (x2, y2) = semillas
+        d.clic(x1, y1, 1)
+        d.clic(x2, y2, 2)
+        d.rotulo(*rotulos[diametro], f"Curva de {diametro} mm\n«Diámetro impulsor (mm)» = {diametro}",
+                 hacia=(x2, y2) if diametro != 608 else (x1 + 3, y1 + 3), tamano=14)
+    d.guardar("digitalizar_diametros.png")
+
     # Clic extra después de un cruce: la curva de 738 mm cruza la MCSF y la de eficiencia.
     x_extra = 300
     d = Dibujo(img, (100, 260, 460, 480))

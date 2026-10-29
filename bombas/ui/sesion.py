@@ -95,6 +95,7 @@ class Sesion:
         self.nombre_archivo = ""
         self.angulo = 0.0
         self.paneles: list[Panel] = []
+        self._paneles_creados = 0  # numera los paneles sin repetir nombres aunque se borren
         self.curvas: list[CurvaRegistrada] = []
         self.puntos_eficiencia: list[PuntoEficiencia] = []
         self.gestor = GestorGraficas(Bomba())
@@ -111,6 +112,7 @@ class Sesion:
         self.nombre_archivo = nombre
         self.angulo = 0.0
         self.paneles, self.curvas, self.puntos_eficiencia = [], [], []
+        self._paneles_creados = 0
         self.gestor.quitar_puntos()
         self.actualizar_graficas()
 
@@ -142,8 +144,33 @@ class Sesion:
         x1, y1 = min(ancho - 1, x1), min(alto - 1, y1)
         if x1 - x0 < 20 or y1 - y0 < 20:
             raise ValueError("El recuadro es demasiado pequeño: marca dos esquinas opuestas de la zona de trazado.")
-        self.paneles.append(Panel(f"Panel {len(self.paneles) + 1}", (x0, y0, x1, y1)))
+        self._paneles_creados += 1
+        self.paneles.append(Panel(f"Panel {self._paneles_creados}", (x0, y0, x1, y1)))
         return len(self.paneles) - 1
+
+    def curvas_de_panel(self, panel: int) -> int:
+        return sum(c.panel == panel for c in self.curvas)
+
+    def quitar_panel(self, panel: int) -> int:
+        """Borra un panel con su calibración y sus curvas. Devuelve cuántas curvas se borraron.
+
+        Las curvas de los demás paneles se conservan (se renumera su panel). Si ya no
+        quedan curvas de igual rendimiento, se borran también los puntos de máximo.
+        """
+        del self.paneles[panel]
+        quedan = []
+        for c in self.curvas:
+            if c.panel == panel:
+                continue
+            if c.panel > panel:
+                c.panel -= 1
+            quedan.append(c)
+        borradas = len(self.curvas) - len(quedan)
+        self.curvas = quedan
+        if not any(c.ajustada.es_iso_eficiencia for c in self.curvas):
+            self.puntos_eficiencia = []
+        self.actualizar_graficas()
+        return borradas
 
     def calibrar_eje(
         self, panel: int, nombre: str, unidad: str, punto1, valor1: float, punto2, valor2: float,

@@ -84,7 +84,7 @@ async def user_con_curva(user: User) -> User:
     await user.should_see("2 clic(s) sobre la curva")
     elemento(user, "diametro").value = 738
     user.find(marker="digitalizar").click()
-    await user.should_see("H – 738 mm · Panel 1")
+    await user.should_see("H – 738 mm · Panel 1", retries=100)  # se digitaliza en segundo plano (hasta 10 s)
     return user
 
 
@@ -175,3 +175,25 @@ async def test_corregir_puntos_a_mano(user_con_curva: User):
     assert int(sesion_curva().split()[0]) == n_antes + 1
     user.find(marker="terminar-correccion").click()
     assert not visible(user, "tarjeta-correccion") and visible(user, "tarjeta-nueva-curva")
+
+
+async def test_borrar_panel(user_con_curva: User):
+    user = user_con_curva
+    user.find(marker="borrar-panel").click()
+    await user.should_see("Se borran su recuadro, su calibración y sus 1 curva(s) digitalizada(s)")
+    user.find(marker="confirmar-borrar-panel").click()
+    await user.should_see("Panel 1 borrado junto con 1 curva(s).")
+    # Se puede volver a crear el panel desde cero; el nombre no se repite.
+    user.find(marker="nuevo-panel").click()
+    clic(user, "lienzo-calibrar", 115, 239)
+    clic(user, "lienzo-calibrar", 707, 758)
+    await user.should_see("Ejes de Panel 2")
+    await user.should_see(marker="marca-Q-1")
+
+
+async def test_enderezar_con_paneles_avisa_sin_romper_la_pagina(user_con_curva: User):
+    # «Enderezar imagen» es asíncrona (se ejecuta en segundo plano): sus errores también son avisos.
+    user = user_con_curva
+    user.find(marker="enderezar").click()
+    await user.should_see("Endereza la imagen antes de definir paneles")
+    await user.should_see("H – 738 mm · Panel 1")  # el trabajo sigue ahí

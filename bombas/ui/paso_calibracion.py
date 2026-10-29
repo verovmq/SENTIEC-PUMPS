@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import cv2
-from nicegui import ui
+from nicegui import run, ui
 
 from bombas.core.modelos import UNIDADES_SUGERIDAS, Escala
 from bombas.ui import guia
@@ -110,11 +110,23 @@ def crear(ctx) -> None:
             with ui.row().classes("items-end gap-2"):
                 selector_panel(ctx)
                 ui.button("Nuevo panel", on_click=lambda: iniciar_panel()).props("outline").mark("nuevo-panel")
-                ui.button("Enderezar imagen", on_click=lambda: enderezar()).props("flat").tooltip(
+                ui.button("Borrar panel", icon="delete", on_click=lambda: pedir_borrar_panel()).props(
+                    "flat color=negative"
+                ).tooltip("Borra el panel activo, su calibración y sus curvas, para volver a hacerlo.").mark(
+                    "borrar-panel"
+                )
+                ui.button("Enderezar imagen", on_click=lambda: enderezar()).props("flat").mark("enderezar").tooltip(
                     "Detecta y corrige una inclinación pequeña de la cuadrícula. Hazlo antes de crear paneles."
                 )
             control_umbral(ctx, "umbral-calibrar")
             ejes_ui = ui.column().classes("w-full")
+    with ui.dialog() as dialogo_borrar, ui.card():
+        texto_borrar = ui.label().classes("text-base")
+        with ui.row().classes("w-full justify-end gap-2"):
+            ui.button("Cancelar", on_click=dialogo_borrar.close).props("flat")
+            ui.button("Borrar", icon="delete", on_click=lambda: borrar_panel()).props("color=negative").mark(
+                "confirmar-borrar-panel"
+            )
 
     def dibujar() -> None:
         s = ctx.sesion
@@ -145,9 +157,42 @@ def crear(ctx) -> None:
         estado.update(modo="recuadro", esquinas=[])
         indicar("Haz clic en dos esquinas opuestas de la zona de trazado del panel (dentro de los ejes).")
 
+    def pedir_borrar_panel() -> None:
+        i = ctx.panel_activo
+        if i is None:
+            ui.notify("No hay ningún panel elegido en «Panel activo».", type="warning")
+            return
+        n = ctx.sesion.curvas_de_panel(i)
+        curvas = f" y sus {n} curva(s) digitalizada(s)" if n else ""
+        texto_borrar.text = (
+            f"¿Borrar «{ctx.sesion.paneles[i].nombre}»? Se borran su recuadro, su calibración{curvas}. "
+            "No se puede deshacer."
+        )
+        dialogo_borrar.open()
+
+    def borrar_panel() -> None:
+        dialogo_borrar.close()
+        i = ctx.panel_activo
+        nombre = ctx.sesion.paneles[i].nombre
+        n = ctx.sesion.quitar_panel(i)
+        estado.update(modo=None, esquinas=[], marcas={})
+        ctx.panel_activo = 0 if ctx.sesion.paneles else None
+        ui.notify(f"{nombre} borrado" + (f" junto con {n} curva(s)." if n else "."), type="positive")
+        indicar("Pulsa «Nuevo panel» y marca la zona de trazado.")
+        ctx.emitir("paneles")
+        ctx.emitir("curvas")
+
     @proteger
-    def enderezar() -> None:
-        angulo = ctx.sesion.enderezar()
+    async def enderezar() -> None:
+        # Puede tardar decenas de segundos en imágenes grandes: se hace en segundo plano
+        # para que la página siga respondiendo (si no, el navegador da la sesión por perdida).
+        if ctx.sesion.paneles:
+            raise ValueError("Endereza la imagen antes de definir paneles (sus coordenadas cambiarían).")
+        aviso = ui.notification("Enderezando la imagen… puede tardar hasta un minuto.", spinner=True, timeout=None)
+        try:
+            angulo = await run.io_bound(ctx.sesion.enderezar)
+        finally:
+            aviso.dismiss()
         ui.notify(f"Inclinación corregida: {angulo:.2f}°" if abs(angulo) >= 0.05 else "La imagen ya está recta.")
         ctx.emitir("imagen")
 

@@ -59,7 +59,9 @@ CALIBRAR = [
     Paso(
         "Solo si el escaneo está torcido: «Enderezar imagen»",
         "Si el gráfico está inclinado (típico de un escaneo), pulsa **«Enderezar imagen»** "
-        "**antes** de crear paneles. Si la imagen ya está recta, no cambia nada.",
+        "**antes** de crear paneles. Si la imagen ya está recta, no cambia nada.\n\n"
+        "En imágenes grandes puede tardar **hasta un minuto**: verás el aviso «Enderezando la imagen…». "
+        "Espera a que desaparezca y **no recargues la página**.",
     ),
     Paso(
         "Crea un panel por cada gráfico: «Nuevo panel»",
@@ -71,7 +73,14 @@ CALIBRAR = [
         "- Si el documento tiene **varios gráficos** separados (por ejemplo, potencia arriba y "
         "altura abajo), crea **un panel para cada uno**.\n"
         "- Si un mismo gráfico tiene **varios ejes verticales** (H a la izquierda, η y NPSH a la "
-        "derecha), es **un solo panel**: luego calibras todos sus ejes.",
+        "derecha), es **un solo panel**: luego calibras todos sus ejes.\n"
+        "- Si un mismo gráfico tiene **varias curvas de altura** (una por diámetro de impulsor), "
+        "también es **un solo panel**: no crees un panel por diámetro.\n\n"
+        "**Para rehacer un panel**: elígelo en **«Panel activo»**, pulsa **«Borrar panel»** y confirma "
+        "con **«Borrar»**. Se borran su recuadro, su calibración y las curvas digitalizadas en él; los "
+        "demás paneles no cambian. Después crea otro con **«Nuevo panel»**.\n\n"
+        "Si solo quieres **corregir un eje**, no hace falta borrar el panel: vuelve a marcar ese eje y "
+        "pulsa **«Guardar eje»** (se sobrescribe).",
         "calibrar_panel.png",
         "Panel 1 (H, η y NPSH) con sus dos clics. La potencia, en otro gráfico, es el Panel 2.",
     ),
@@ -154,9 +163,17 @@ DIGITALIZAR = [
     ),
     Paso(
         "Si el gráfico tiene varios diámetros de impulsor",
-        "Muchos fabricantes dibujan una curva de H **por cada diámetro** del impulsor (por ejemplo "
-        "768, 738 y 608 mm, con el diámetro escrito junto a la curva). Cada una se digitaliza **por "
-        "separado** y con **su diámetro** en **«Diámetro impulsor (mm)»**.\n\n"
+        "Muchos fabricantes dibujan en la **misma gráfica** una curva de H **por cada diámetro** del "
+        "impulsor (por ejemplo 768, 738 y 608 mm, con el diámetro escrito junto a la curva). Todas "
+        "están en el **mismo panel**; cada una se digitaliza **por separado** con **su diámetro**:\n\n"
+        "1. **«Magnitud»** = H, **«Diámetro impulsor (mm)»** = **768**, clic 1 y clic 2 sobre la curva "
+        "de 768 y **«Digitalizar curva»**.\n"
+        "2. Cambia **«Diámetro impulsor (mm)»** a **738**, clics sobre la curva de 738 y "
+        "**«Digitalizar curva»**.\n"
+        "3. Lo mismo con **608**.\n\n"
+        "No hay límite: digitaliza tantas curvas como diámetros tenga el gráfico. Antes de cada "
+        "**«Digitalizar curva»** comprueba que el diámetro escrito es el de la curva que marcaste: "
+        "el campo **no se vacía solo** entre una curva y otra.\n\n"
         "Para las demás magnitudes (η, NPSH, P), mira el gráfico:\n\n"
         "- Si hay **una curva por diámetro** (por ejemplo, una potencia para 635 mm y otra para "
         "508 mm), digitaliza cada una con **su diámetro**.\n"
@@ -165,6 +182,8 @@ DIGITALIZAR = [
         "Escribe **exactamente el mismo número** en todas las curvas del mismo impulsor: 738 y 740 "
         "serían dos diámetros distintos. En la lista **«Curvas "
         "digitalizadas»** cada curva aparece con su diámetro («H – 738 mm») para que lo compruebes.",
+        "digitalizar_diametros.png",
+        "Tres curvas de altura en la misma gráfica: cada una con sus dos clics y su diámetro.",
     ),
     Paso(
         "Haz clic sobre la curva: principio y final",
@@ -262,8 +281,9 @@ CALCULADORAS = [
     Paso(
         "Las tres gráficas",
         "A la izquierda están las tres gráficas de la sesión: **altura y eficiencia**, **NPSH** y "
-        "**potencia**, con las curvas digitalizadas en negro y su diámetro. Se actualizan solas cuando "
-        "digitalizas o borras curvas.\n\n"
+        "**potencia**, con las curvas digitalizadas en negro. Si digitalizaste varios diámetros, todas "
+        "sus curvas salen **juntas en la misma gráfica**, cada una **rotulada con su diámetro** "
+        "(«H – 768 mm», «H – 738 mm»…). Se actualizan solas cuando digitalizas o borras curvas.\n\n"
         "Para ampliar, arrastra con el ratón sobre una zona; con **doble clic** vuelve a la vista completa.",
         "calculadoras_grafica.png",
         "Un punto de cada cuadro: morado (Cuadro 1), azul (Cuadro 2) y naranja (Cuadro 3).",
@@ -279,8 +299,9 @@ CALCULADORAS = [
         "- El desplegable **empieza vacío**: hasta que elijas el diámetro, la fila muestra «Elige el "
         "«Diámetro» de esta fila.» y no calcula nada. Así nunca se calcula con un impulsor que no es "
         "el tuyo.\n"
-        "- Cada fila tiene su propio diámetro: puedes comparar diámetros con varias filas "
-        "(**«Agregar»**).\n"
+        "- Cada fila tiene su propio diámetro: para **comparar diámetros**, pulsa **«Agregar»** y pon "
+        "el mismo caudal en varias filas con distinto diámetro (por ejemplo Q = 2000 con 768 y con "
+        "608). Cada punto se dibuja sobre la curva de su diámetro.\n"
         "- Si ninguna curva tiene diámetro, el desplegable no aparece.",
     ),
     Paso(
